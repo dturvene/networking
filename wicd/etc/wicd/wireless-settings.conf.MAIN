@@ -1,0 +1,59 @@
+[18:1B:EB:77:25:BB]
+afterscript = None
+bssid = 18:1B:EB:77:25:BB
+ip = 192.168.1.101
+gateway = 192.168.1.1
+use_global_dns = False
+encryption = True
+postdisconnectscript = None
+beforescript = None
+hidden = False
+channel = 6
+mode = Master
+psk = 08cadc08951ae46d46fe8e2d0a6a5f7555fc23cb247fe1c9f0555b4ed6919c6e
+netmask = 255.255.255.0
+key = 0ctOpu$7PTN
+predisconnectscript = None
+enctype = wpa-psk
+use_settings_globally = False
+use_static_dns = False
+apsk = 0ctOpu$7PTN
+encryption_method = WPA2
+essid = LQ63F
+automatic = True
+
+[C4:6E:1F:6B:B3:EC]
+bssid = C4:6E:1F:6B:B3:EC
+encryption = False
+essid = FIVEGRAPES
+hidden = False
+channel = 11
+mode = Master
+beforescript = None
+afterscript = None
+predisconnectscript = None
+postdisconnectscript = None
+
+[C4:6E:1F:D6:51:54]
+afterscript = None
+bssid = C4:6E:1F:D6:51:54
+postdisconnectscript = None
+gateway = 192.168.2.1
+use_global_dns = False
+encryption = True
+ip = 192.168.2.11
+beforescript = None
+hidden = False
+channel = 6
+mode = Master
+netmask = 255.255.255.0
+key = 0ctOpu$7PTN
+predisconnectscript = None
+enctype = wpa-psk
+use_settings_globally = False
+use_static_dns = False
+apsk = 0ctOpu$7PTN
+encryption_method = WPA2
+essid = LQ63F
+automatic = True
+

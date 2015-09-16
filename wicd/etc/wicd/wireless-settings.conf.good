@@ -1,0 +1,31 @@
+[00:1F:90:EB:0E:1D]
+afterscript = None
+dhcphostname = beaglebone
+bssid = 00:1F:90:EB:0E:1D
+ip = None
+dns_domain = None
+gateway = None
+use_global_dns = False
+encryption = True
+postdisconnectscript = None
+beforescript = None
+hidden = False
+channel = 6
+mode = Master
+psk = 10989f243495795a88443820aed024751bfbe2242c21bd36b74435c8106c6f5a
+netmask = None
+key = 0ctOpu$7
+usedhcphostname = 0
+predisconnectscript = None
+enctype = wpa
+autoconnect = T
+dns3 = None
+dns2 = None
+dns1 = None
+use_settings_globally = False
+use_static_dns = False
+encryption_method = WPA2
+essid = EJRW1
+automatic = 1
+search_domain = None
+
