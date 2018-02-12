@@ -6,8 +6,11 @@
  * 1. use a static port or dynamically assigned by the kernel to listen on
  * 2. use blocking or nonblocking input from the clients
  * 3. use level-triggered or edge-triggered epoll_wait interface 
+ * 
+ * There is very little recovery code.  Nothing should fail but if it does then
+ * the program will die.
  *
- * This has been tested on Ubuntu 16.04 using gcc -g -o epoll_server epoll_server.c
+ * This has been tested on Ubuntu 16.04 compiled using: gcc -g -o epoll_server epoll_server.c
  *
  * Copyright 2018 Dahetral Systems
  * David Turvene <dturvene at dahetral dot com>
@@ -27,47 +30,15 @@
 
 #define die(msg)  do { perror(msg); exit(EXIT_FAILURE); } while (0)
 
-/* static time delta structures NOT REENTRANT, so don't use in a threaded
- * application  
- */
-static struct timespec ts, te, delta;
-
-/** save current clock in static ts timespec */
-inline static void ts_start() {
-	clock_gettime(CLOCK_MONOTONIC, &ts);
-}
-
-/** save current clock in static te timespec */
-inline static void ts_end() {
-	clock_gettime(CLOCK_MONOTONIC, &te);
-}
-
-/** calculate the delta between static te and ts and return a string */
-inline static char* ts_delta()
-{
-	static char tmpbuf[80];
-
-	/* calculate timer offset */
-	if ((te.tv_nsec - ts.tv_nsec) < 0) {
-		delta.tv_sec = te.tv_sec - ts.tv_sec - 1;
-		delta.tv_nsec = 1e9 + te.tv_nsec - ts.tv_nsec;
-	} else  {
-		delta.tv_sec = te.tv_sec - ts.tv_sec;
-		delta.tv_nsec = te.tv_nsec - ts.tv_nsec;
-	}
-	sprintf(tmpbuf, "time delta=%ld.%09ld", delta.tv_sec, delta.tv_nsec);
-	return(tmpbuf);
-}
-
 /* write listening port here for local clients to access */
 #define PORTFILE "/tmp/server.port"
 
 /********************* command line arguments ************/
-char *arguments = "\n"					\
-	"n: set reads to nonblocking mode"		\
-	"f: fixed port to listen on"			\
-	"e: edge-triggered epoll"			\
-	"h: this help\n";
+char *arguments = "\n"						\
+	" -n: set reads to nonblocking mode\n"			\
+	" -f portnum: fixed port to listen on\n"		\
+	" -e: edge-triggered epoll\n"				\
+	" -h: this help\n";
 
 /* this are hack debug globals for demonstration so I don't have
  * to pass around arguments or a context block 
@@ -92,7 +63,7 @@ int cmdline_args(int argc, char *argv[]) {
 			fixed_portnum = strtoul(optarg, NULL, 0);
 			break;
 		case 'h':
-			fprintf(stderr, "Usage: %s %s\n", argv[0], arguments);
+			fprintf(stderr, "Usage: %s args: %s\n", argv[0], arguments);
 			exit(0);
 		default:
 			argcnt++;
@@ -135,14 +106,18 @@ void add_fd_to_epoll(int epoll_fd, int remotefd)
 	event.data.fd = remotefd;
 	event.events = EPOLLIN;
 	if (nonblocking_read_flag) {
-		fprintf(stderr, "fd=%d set to nonblocking\n", remotefd);
 		set_nonblocking_read(remotefd);
 	}
 
 	if (et_flag) {
-		fprintf(stderr, "fd=%d set to edge-triggered poll\n", remotefd);
 		event.events |= EPOLLET;
 	}
+
+	fprintf(stderr, "fd=%d set to %s read and %s epoll_wait\n", remotefd,
+		nonblocking_read_flag ? "Non-blocking" : "Blocking",
+		et_flag ? "Edge-triggered" : "Level-triggered"
+		);
+
 	
 	if (-1 == epoll_ctl(epoll_fd, EPOLL_CTL_ADD, remotefd, &event))
 		die("epoll_ctl adding a newfd");
@@ -251,17 +226,21 @@ int create_and_bind_dyn(void)
 	return listenfd;
 }
 
-/* 
+/** 
  *
+ * @param listen_fd    the listening socket to accept the incoming connection
+ * @param epoll_fd     the epoll file descriptor
+ * 
+ * Accepts and incoming connection and adds it the epoll list.
  */
-int add_remote(int sock_fd, int epoll_fd)
+void add_remote(int listen_fd, int epoll_fd)
 {
 	struct sockaddr in_addr;
 	socklen_t in_len = sizeof(in_addr);
 	char hbuf[32], sbuf[32];
 	int infd;
 		
-	if (-1 == (infd=accept(sock_fd, &in_addr, &in_len))) {
+	if (-1 == (infd=accept(listen_fd, &in_addr, &in_len))) {
 		die("accept");
 	}
 
@@ -273,15 +252,21 @@ int add_remote(int sock_fd, int epoll_fd)
 		fprintf(stderr, "Accepting connection from host=%s port=%s\n", hbuf, sbuf);
 	}
 
+	/* add accepted infd to epoll list */
 	add_fd_to_epoll(epoll_fd, infd);
-
-	return 0;
 }
 
-int read_remote_blocking(int remote_fd)
+/**
+ * @param remote_fd       the remote file descriptor from which to read
+ * @return total number of characters read
+ * 
+ * Read until the local buffer available data from the remote up to
+ * the size of the buffer. It writes the read string to stderr.
+ */
+int read_client_blocking(int remote_fd)
 {
 	ssize_t n;
-	char buf[4];
+	char buf[4]; /* make a very small buffer to force blocking */
 
 	n = read(remote_fd, buf, sizeof(buf));
 
@@ -300,14 +285,16 @@ int read_remote_blocking(int remote_fd)
 
 /**
  * @param remote_fd       the remote file descriptor from which to read
- *
- * @return
+ * @return total number of characters read
+ * 
+ * This will read until there is an EWOULDBLOCK error indicating no more
+ * data.  It writes the read string to stderr.
  */
-int read_remote_nonblocking(int remote_fd)
+int read_client_nonblocking(int remote_fd)
 {
 	ssize_t n;
 	int reading = 1;
-	char buf[4];
+	char buf[4];  /* make a very small buffer to force looping */
 	int total_n = 0;
 	
 	do {
@@ -337,16 +324,23 @@ int read_remote_nonblocking(int remote_fd)
 	return total_n;
 }
 
-void read_remote(int remote_fd)
+/**
+ * @param remote_fd       the remote file descriptor from which to read
+ * 
+ * Selects the appropriate read function and writes out the total number of
+ * bytes read.
+ */
+void read_client(int remote_fd)
 {
 	int n;
 
 	if (nonblocking_read_flag)
-		n = read_remote_nonblocking(remote_fd);
+		n = read_client_nonblocking(remote_fd);
 	else
-		n = read_remote_blocking(remote_fd);
+		n = read_client_blocking(remote_fd);
 	fprintf(stderr, "%s: Reading %d bytes\n", __func__, n);
 }
+
 
 int main (int argc, char *argv[])
 {
@@ -373,9 +367,6 @@ int main (int argc, char *argv[])
 	if (-1 == (epoll_fd=epoll_create1(0)))
 		die("epoll");
 
-	/* set up stdin */
-	add_fd_to_epoll(epoll_fd, 0);
-
 	/* set up listening socket 
 	 * this does not need to be edge-triggered, only
 	 * incoming connections
@@ -385,9 +376,13 @@ int main (int argc, char *argv[])
 	if (-1 == epoll_ctl(epoll_fd, EPOLL_CTL_ADD, listen_fd, &event))
 		die("epoll_ctl");
 
+	/* add stdin to poll list */
+	add_fd_to_epoll(epoll_fd, 0);
+
 	while(1) {
 		int i, n;
 
+		/* block waiting for epoll events */
 		if (-1 == (n=epoll_wait(epoll_fd, events, 4, -1)))
 			die("epoll_wait");
 
@@ -398,18 +393,15 @@ int main (int argc, char *argv[])
 			if ((events[i].events & EPOLLERR) ||
 			    (events[i].events & EPOLLHUP) ||
 			    (!(events[i].events & EPOLLIN))) {
-				fprintf(stderr, "epoll error\n");
+				fprintf(stderr, "epoll error on %d\n", events[i].data.fd);
 				close(events[i].data.fd);
 				continue;
 			}
 
 			if (events[i].data.fd == listen_fd) {
 				add_remote(listen_fd, epoll_fd);
-				ts_start();
 			} else {
-				read_remote(events[i].data.fd);
-				ts_end();
-				fprintf(stderr, "%s\n", ts_delta());
+				read_client(events[i].data.fd);
 			}
 		} /* event loop */
 	} /* while forever */
