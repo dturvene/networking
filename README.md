@@ -1,5 +1,7 @@
 # Networking Research
-This repo contains demonstration programs for 
+This repo contains demonstration programs for Linux networking.
+
+1. epoll using combinations of edge/level triggers and blocking reads.
 
 ## Epoll Edge-trigger and Non-blocking Server
 There is a lot of mysterious code out there related to the epoll edge-triggered
