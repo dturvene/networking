@@ -7,6 +7,8 @@
  * 2. use blocking or nonblocking input from the clients
  * 3. use level-triggered or edge-triggered epoll_wait interface 
  *
+ * This has been tested on Ubuntu 16.04 using gcc -g -o epoll_server epoll_server.c
+ *
  * Copyright 2018 Dahetral Systems
  * David Turvene <dturvene at dahetral dot com>
  */
