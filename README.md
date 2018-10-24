@@ -1,7 +1,13 @@
 # Networking Research
 This repo contains demonstration programs for Linux networking.
 
-1. epoll using combinations of edge/level triggers and blocking reads.
+1. python load test harness for wifi WPA network, change the device MAC and IP to hammer an openwrt router
+2. epoll using combinations of edge/level triggers and blocking reads.
+
+## Python2 test harness
+Use the pyroute2 python package to modify the IP and MAC of a wifi interface.  pyroute2 uses the netlink interface.
+
+**this is a work in progress**
 
 ## Epoll Edge-trigger and Non-blocking Server
 There is a lot of mysterious code out there related to the epoll edge-triggered
